@@ -12,10 +12,20 @@
   "sourceUrl": "",
   "donateUrl": "",
   "changelogUrl": "",
-  "modules": [{
+  "modules": [
+    {
       "slug": "MyModule",
       "name": "MyModule",
       "description": "",
       "tags": []
-    }]
+    },
+    {
+      "slug": "PictureThis",
+      "name": "PictureThis",
+      "description": "Play your favourite photo",
+      "tags": [
+        "sequencer"
+      ]
+    }
+  ]
 }
