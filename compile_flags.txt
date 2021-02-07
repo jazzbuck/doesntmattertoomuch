@@ -1,0 +1,10 @@
+-I/home/alexander/Rack-SDK/include
+-I/home/alexander/Rack-SDK/deps/include
+-Isrc
+-std=c++17
+-fPIC
+-DARCH_LIN
+-Wsuggest-override
+-Wall
+-Wextra
+-Wno-unused-parameter
