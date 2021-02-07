@@ -18,6 +18,7 @@ struct MyModule : Module {
 		BLINK_LIGHT,
 		NUM_LIGHTS
 	};
+    
 
 	MyModule() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -25,7 +26,33 @@ struct MyModule : Module {
 	}
 
 	void process(const ProcessArgs& args) override {
+        float pitch = params[PITCH_PARAM].getValue();
+        pitch += inputs[PITCH_INPUT].getVoltage();
+        pitch = clamp(pitch, -4.f, 4.f);
+
+        float freq = dsp::FREQ_C4 * std::pow(2.f, pitch);
+
+        
+        phase += freq * args.sampleTime;
+        if (phase >= 0.5f)
+            phase -=1.f;
+
+
+        float sine = std::sin(2.f * M_PI * phase);
+
+        outputs[SINE_OUTPUT].setVoltage(5.f * sine);
+
+        blinkPhase += args.sampleTime;
+        if (blinkPhase >= 1.f)
+            blinkPhase -= 1.f;
+        lights[BLINK_LIGHT].setBrightness(blinkPhase < 0.5f ? 1.f : 0.f);
+
 	}
+    
+    private:
+    
+    float phase = 0.f;
+    float blinkPhase = 0.f;
 };
 
 
