@@ -34,18 +34,23 @@ struct PngWidget : TransparentWidget
     explicit PngWidget()
     {}
 
-    void setImagePath(std::string new_path)
+    void setImage(std::string new_path)
     {
         image_path_ = std::move(new_path);
         new_image_path_ = true;
 
         unsigned char* ptr = stbi_load(image_path_.c_str(), &width_, &height_, &comp_, 4);
         image_data_.reset(ptr);
+
     }
 
     void draw(DrawArgs const& args) override
     {
-        int const handle = nvgCreateImageRGBA(args.vg, width_, height_, 0, image_data_.get());
+        if (new_image_path_)
+        {
+            nvg_handle_ = nvgCreateImageRGBA(args.vg, width_, height_, 0, image_data_.get());
+            new_image_path_ = false;
+        }
 
         nvgBeginPath(args.vg);
 
@@ -54,7 +59,7 @@ struct PngWidget : TransparentWidget
         auto const scale_factor = std::max(scale_factor_x, scale_factor_y);
         nvgScale(args.vg, scale_factor, scale_factor);
 
-        NVGpaint const paint = nvgImagePattern(args.vg, x_, y_, width_, height_, 0.0f, handle, 1.0f);
+        NVGpaint const paint = nvgImagePattern(args.vg, x_, y_, width_, height_, 0.0f, nvg_handle_, 1.0f);
         nvgRect(args.vg, x_, y_, width_, height_);
         nvgFillPaint(args.vg, paint);
         nvgFill(args.vg);
@@ -82,6 +87,7 @@ private:
     int comp_{};
     int x_{};
     int y_{};
+    int nvg_handle_{};
 };
 
 struct PictureThisWidget : ModuleWidget {
@@ -107,8 +113,10 @@ struct PictureThisWidget : ModuleWidget {
         auto* image = new PngWidget();
         image->box.pos = Vec{100.0f, 50.0f};
         image->box.size = Vec{box.size.x - 150.0f, box.size.y - 100.0f};
-        image->setImagePath(asset::plugin(pluginInstance, "res/Test.png"));
+        image->setImage(asset::plugin(pluginInstance, "res/Test.png"));
         addChild(image);
+
+        std::string str = std::string{"hi"};
     }
 };
 
