@@ -3,6 +3,39 @@
 #include <stb_image.h>
 #include <widget/TransparentWidget.hpp>
 
+struct ImageData
+{
+    ImageData() = default;
+
+    explicit ImageData(char const* file_path)
+    {
+        data_ = std::shared_ptr<unsigned char>{stbi_load(file_path, &width_, &height_, &comp_, 4), &stbi_image_free};
+    }
+
+    unsigned char const* data() const
+    {
+        return data_.get();
+    }
+    int height() const
+    {
+        return height_;
+    }
+    int width() const
+    {
+        return width_;
+    }
+    int comp() const
+    {
+        return comp_;
+    }
+
+private:
+    std::shared_ptr<unsigned char> data_{};
+    int height_{};
+    int width_{};
+    int comp_{};
+};
+
 struct PictureThis : Module {
 	enum ParamIds {
 		NUM_PARAMS
@@ -27,40 +60,47 @@ struct PictureThis : Module {
 
 	void process(const ProcessArgs& args) override {
 	}
+
+    void setImageData(ImageData data)
+    {
+        image_data_ = std::move(data);
+    }
+
+private:
+    ImageData image_data_;
 };
 
 struct PngWidget : TransparentWidget
 {
-    explicit PngWidget()
+    explicit PngWidget(PictureThis* module)
+        : module_{module}
     {}
 
     void setImage(std::string new_path)
     {
-        image_path_ = std::move(new_path);
-        new_image_path_ = true;
-
-        unsigned char* ptr = stbi_load(image_path_.c_str(), &width_, &height_, &comp_, 4);
-        image_data_.reset(ptr);
-
+        new_image_ = true;
+        image_data_ = ImageData(new_path.c_str());
+        module_->setImageData(image_data_);
     }
 
     void draw(DrawArgs const& args) override
     {
-        if (new_image_path_)
+        if (new_image_)
         {
-            nvg_handle_ = nvgCreateImageRGBA(args.vg, width_, height_, 0, image_data_.get());
-            new_image_path_ = false;
+            nvg_handle_ = nvgCreateImageRGBA(args.vg, image_data_.width(), image_data_.height(), 0, image_data_.data());
+            new_image_ = false;
         }
 
         nvgBeginPath(args.vg);
 
-        auto const scale_factor_x = box.size.x / width_;
-        auto const scale_factor_y = box.size.y / height_;
+        auto const scale_factor_x = box.size.x / image_data_.width();
+        auto const scale_factor_y = box.size.y / image_data_.height();
         auto const scale_factor = std::max(scale_factor_x, scale_factor_y);
         nvgScale(args.vg, scale_factor, scale_factor);
 
-        NVGpaint const paint = nvgImagePattern(args.vg, x_, y_, width_, height_, 0.0f, nvg_handle_, 1.0f);
-        nvgRect(args.vg, x_, y_, width_, height_);
+        NVGpaint const paint =
+            nvgImagePattern(args.vg, x_, y_, image_data_.width(), image_data_.height(), 0.0f, nvg_handle_, 1.0f);
+        nvgRect(args.vg, x_, y_, image_data_.width(), image_data_.height());
         nvgFillPaint(args.vg, paint);
         nvgFill(args.vg);
 
@@ -68,26 +108,14 @@ struct PngWidget : TransparentWidget
     }
 
 private:
-    struct Deleter
-    {
-        void operator()(unsigned char* ptr)
-        {
-            stbi_image_free(ptr);
-        }
-    };
+    bool new_image_{};
 
-    using ImagePtr = std::unique_ptr<unsigned char, Deleter>;
-
-    std::string image_path_{};
-    bool new_image_path_{};
-
-    ImagePtr image_data_{};
-    int height_{};
-    int width_{};
-    int comp_{};
+    ImageData image_data_{};
     int x_{};
     int y_{};
     int nvg_handle_{};
+
+    PictureThis* module_;
 };
 
 struct PictureThisWidget : ModuleWidget {
@@ -110,7 +138,7 @@ struct PictureThisWidget : ModuleWidget {
 		addChild(createWidget<Widget>(mm2px(Vec(29.864, 5.502))));
 
         // Add a demo image
-        auto* image = new PngWidget();
+        auto* image = new PngWidget(module);
         image->box.pos = Vec{100.0f, 50.0f};
         image->box.size = Vec{box.size.x - 150.0f, box.size.y - 100.0f};
         image->setImage(asset::plugin(pluginInstance, "res/Test.png"));
