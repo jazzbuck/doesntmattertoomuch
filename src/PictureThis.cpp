@@ -3,6 +3,7 @@
 #include <stb_image.h>
 #include <widget/TransparentWidget.hpp>
 #include <dsp/digital.hpp>
+#include <osdialog.h>
 
 struct ImageData
 {
@@ -115,6 +116,15 @@ private:
     ImageData image_data_;
 };
 
+struct PictureThisWidget;
+
+struct LoadImageItem : MenuItem
+{
+    PictureThisWidget* widget_;
+
+    void onAction(event::Action const&) override;
+};
+
 struct PngWidget : TransparentWidget
 {
     explicit PngWidget(PictureThis* module)
@@ -192,12 +202,39 @@ struct PictureThisWidget : ModuleWidget {
 		addChild(createWidget<Widget>(mm2px(Vec(29.864, 5.502))));
 
         // Add a demo image
-        auto* image = new PngWidget(module);
-        image->box.pos = Vec{100.0f, 50.0f};
-        image->box.size = Vec{box.size.x - 150.0f, box.size.y - 100.0f};
-        image->setImage(asset::plugin(pluginInstance, "res/Test.png"));
-        addChild(image);
+        image_widget_ = new PngWidget(module);
+        image_widget_->box.pos = Vec{100.0f, 50.0f};
+        image_widget_->box.size = Vec{box.size.x - 150.0f, box.size.y - 100.0f};
+        image_widget_->setImage(asset::plugin(pluginInstance, "res/Test.png"));
+        addChild(image_widget_);
     }
+
+    void appendContextMenu(Menu* menu) override
+    {
+        LoadImageItem* load_item = createMenuItem<LoadImageItem>("Load image (PNG)");
+        load_item->widget_ = this;
+        menu->addChild(load_item);
+    }
+
+    void loadImageDialog()
+    {
+        char* path_cstr = osdialog_file(OSDIALOG_OPEN, ".", nullptr, nullptr);
+        if (!path_cstr)
+        {
+            return;
+        }
+
+        image_widget_->setImage(path_cstr);
+        std::free(path_cstr);
+    }
+
+private:
+    PngWidget* image_widget_;
 };
+
+void LoadImageItem::onAction(event::Action const& e)
+{
+    widget_->loadImageDialog();
+}
 
 Model* modelPictureThis = createModel<PictureThis, PictureThisWidget>("PictureThis");
