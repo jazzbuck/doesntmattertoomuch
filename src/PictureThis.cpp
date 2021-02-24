@@ -2,6 +2,7 @@
 #include <nanovg.h>
 #include <stb_image.h>
 #include <widget/TransparentWidget.hpp>
+#include <dsp/digital.hpp>
 
 struct ImageData
 {
@@ -9,7 +10,14 @@ struct ImageData
 
     explicit ImageData(char const* file_path)
     {
-        data_ = std::shared_ptr<unsigned char>{stbi_load(file_path, &width_, &height_, &comp_, 4), &stbi_image_free};
+        unsigned char* ptr = stbi_load(file_path, &width_, &height_, &comp_, 4);
+
+        if (ptr == nullptr)
+        {
+            throw std::runtime_error("STBI failed to load in the image");
+        }
+
+        data_ = std::shared_ptr<unsigned char>{ptr, &stbi_image_free};
     }
 
     unsigned char const* data() const
@@ -58,15 +66,52 @@ struct PictureThis : Module {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 	}
 
-	void process(const ProcessArgs& args) override {
+	void process(const ProcessArgs& args) override
+    {
+        auto const comp = image_data_.comp();
+
+        auto const num_channels = inputs[CLOCK_INPUT].getChannels();
+
+        std::vector<float> voltage_per_channel(comp);
+        if (num_channels < comp)
+        {
+            auto const input_voltage = inputs[CLOCK_INPUT].getVoltage();
+            for (float& v : voltage_per_channel)
+                v = input_voltage;
+        }
+        else
+        {
+            for (auto i = 0; i < comp; ++i)
+            {
+                voltage_per_channel[i] = inputs[CLOCK_INPUT].getVoltage(i);
+            }
+        }
+
+        for (auto i = 0; i < std::min(static_cast<int>(NUM_OUTPUTS), comp); ++i)
+        {
+            bool const did_turn_on = trigger_per_channel_[i].process(voltage_per_channel[i]);
+            if (did_turn_on)
+            {
+                count_per_channel_[i]++;
+                int const image_index = i + comp * count_per_channel_[i];
+                unsigned char const pixel_value = image_data_.data()[image_index];
+                float const output_voltage = 10.0f * pixel_value / 255.0f;
+                outputs[i].setVoltage(output_voltage);
+                // std::cout << "Pixel value (" << i << ") = " << output_voltage << '\n';
+            }
+        }
 	}
 
     void setImageData(ImageData data)
     {
         image_data_ = std::move(data);
+        trigger_per_channel_.resize(image_data_.comp());
+        count_per_channel_.resize(image_data_.comp());
     }
 
 private:
+    std::vector<dsp::SchmittTrigger> trigger_per_channel_{};
+    std::vector<int> count_per_channel_{};
     ImageData image_data_;
 };
 
@@ -80,11 +125,20 @@ struct PngWidget : TransparentWidget
     {
         new_image_ = true;
         image_data_ = ImageData(new_path.c_str());
-        module_->setImageData(image_data_);
+
+        if (module_)
+        {
+            module_->setImageData(image_data_);
+        }
     }
 
     void draw(DrawArgs const& args) override
     {
+        if (!image_data_.data())
+        {
+            return;
+        }
+
         if (new_image_)
         {
             nvg_handle_ = nvgCreateImageRGBA(args.vg, image_data_.width(), image_data_.height(), 0, image_data_.data());
@@ -143,8 +197,6 @@ struct PictureThisWidget : ModuleWidget {
         image->box.size = Vec{box.size.x - 150.0f, box.size.y - 100.0f};
         image->setImage(asset::plugin(pluginInstance, "res/Test.png"));
         addChild(image);
-
-        std::string str = std::string{"hi"};
     }
 };
 
