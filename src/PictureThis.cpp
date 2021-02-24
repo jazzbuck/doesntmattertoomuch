@@ -93,8 +93,11 @@ struct PictureThis : Module {
             bool const did_turn_on = trigger_per_channel_[i].process(voltage_per_channel[i]);
             if (did_turn_on)
             {
-                count_per_channel_[i]++;
-                int const image_index = i + comp * count_per_channel_[i];
+                auto& count = count_per_channel_[i];
+
+                count = (count + 1) % (image_data_.width() * image_data_.height());
+
+                int const image_index = i + comp * count;
                 unsigned char const pixel_value = image_data_.data()[image_index];
                 float const output_voltage = 10.0f * pixel_value / 255.0f;
                 outputs[i].setVoltage(output_voltage);
@@ -107,7 +110,7 @@ struct PictureThis : Module {
     {
         image_data_ = std::move(data);
         trigger_per_channel_.resize(image_data_.comp());
-        count_per_channel_.resize(image_data_.comp());
+        count_per_channel_.resize(image_data_.comp(), 0);
     }
 
 private:
