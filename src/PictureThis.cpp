@@ -10,7 +10,14 @@ struct ImageData
 
     explicit ImageData(char const* file_path)
     {
-        data_ = std::shared_ptr<unsigned char>{stbi_load(file_path, &width_, &height_, &comp_, 4), &stbi_image_free};
+        unsigned char* ptr = stbi_load(file_path, &width_, &height_, &comp_, 4);
+
+        if (ptr == nullptr)
+        {
+            throw std::runtime_error("STBI failed to load in the image");
+        }
+
+        data_ = std::shared_ptr<unsigned char>{ptr, &stbi_image_free};
     }
 
     unsigned char const* data() const
@@ -61,10 +68,12 @@ struct PictureThis : Module {
 
 	void process(const ProcessArgs& args) override
     {
+        auto const comp = image_data_.comp();
+
         auto const num_channels = inputs[CLOCK_INPUT].getChannels();
 
-        std::array<float, 4> voltage_per_channel{};
-        if (num_channels < 4)
+        std::vector<float> voltage_per_channel(comp);
+        if (num_channels < comp)
         {
             auto const input_voltage = inputs[CLOCK_INPUT].getVoltage();
             for (float& v : voltage_per_channel)
@@ -72,33 +81,37 @@ struct PictureThis : Module {
         }
         else
         {
-            for (auto i = 0; i < 4; ++i)
+            for (auto i = 0; i < comp; ++i)
             {
                 voltage_per_channel[i] = inputs[CLOCK_INPUT].getVoltage(i);
             }
         }
 
-        for (auto i = 0; i < 4; ++i)
+        for (auto i = 0; i < std::min(static_cast<int>(NUM_OUTPUTS), comp); ++i)
         {
-            trigger_per_channel_[i].process(voltage_per_channel[i]);
-            if (trigger_per_channel_[i].isHigh())
+            bool const did_turn_on = trigger_per_channel_[i].process(voltage_per_channel[i]);
+            if (did_turn_on)
             {
                 count_per_channel_[i]++;
-                outputs[i] = image_data_.data()[count_per_channel_[i]];
+                int const image_index = i + comp * count_per_channel_[i];
+                unsigned char const pixel_value = image_data_.data()[image_index];
+                float const output_voltage = 10.0f * pixel_value / 255.0f;
+                outputs[i].setVoltage(output_voltage);
+                // std::cout << "Pixel value (" << i << ") = " << output_voltage << '\n';
             }
         }
-
-
 	}
 
     void setImageData(ImageData data)
     {
         image_data_ = std::move(data);
+        trigger_per_channel_.resize(image_data_.comp());
+        count_per_channel_.resize(image_data_.comp());
     }
 
 private:
-    std::array<dsp::SchmittTrigger, 4> trigger_per_channel_{};
-    std::array<int, 4> count_per_channel_{};
+    std::vector<dsp::SchmittTrigger> trigger_per_channel_{};
+    std::vector<int> count_per_channel_{};
     ImageData image_data_;
 };
 
