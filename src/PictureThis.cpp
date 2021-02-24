@@ -2,6 +2,7 @@
 #include <nanovg.h>
 #include <stb_image.h>
 #include <widget/TransparentWidget.hpp>
+#include <dsp/digital.hpp>
 
 struct ImageData
 {
@@ -58,7 +59,36 @@ struct PictureThis : Module {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 	}
 
-	void process(const ProcessArgs& args) override {
+	void process(const ProcessArgs& args) override
+    {
+        auto const num_channels = inputs[CLOCK_INPUT].getChannels();
+
+        std::array<float, 4> voltage_per_channel{};
+        if (num_channels < 4)
+        {
+            auto const input_voltage = inputs[CLOCK_INPUT].getVoltage();
+            for (float& v : voltage_per_channel)
+                v = input_voltage;
+        }
+        else
+        {
+            for (auto i = 0; i < 4; ++i)
+            {
+                voltage_per_channel[i] = inputs[CLOCK_INPUT].getVoltage(i);
+            }
+        }
+
+        for (auto i = 0; i < 4; ++i)
+        {
+            trigger_per_channel_[i].process(voltage_per_channel[i]);
+            if (trigger_per_channel_[i].isHigh())
+            {
+                count_per_channel_[i]++;
+                outputs[i] = image_data_.data()[count_per_channel_[i]];
+            }
+        }
+
+
 	}
 
     void setImageData(ImageData data)
@@ -67,6 +97,8 @@ struct PictureThis : Module {
     }
 
 private:
+    std::array<dsp::SchmittTrigger, 4> trigger_per_channel_{};
+    std::array<int, 4> count_per_channel_{};
     ImageData image_data_;
 };
 
@@ -80,11 +112,20 @@ struct PngWidget : TransparentWidget
     {
         new_image_ = true;
         image_data_ = ImageData(new_path.c_str());
-        module_->setImageData(image_data_);
+
+        if (module_)
+        {
+            module_->setImageData(image_data_);
+        }
     }
 
     void draw(DrawArgs const& args) override
     {
+        if (!image_data_.data())
+        {
+            return;
+        }
+
         if (new_image_)
         {
             nvg_handle_ = nvgCreateImageRGBA(args.vg, image_data_.width(), image_data_.height(), 0, image_data_.data());
@@ -143,8 +184,6 @@ struct PictureThisWidget : ModuleWidget {
         image->box.size = Vec{box.size.x - 150.0f, box.size.y - 100.0f};
         image->setImage(asset::plugin(pluginInstance, "res/Test.png"));
         addChild(image);
-
-        std::string str = std::string{"hi"};
     }
 };
 
