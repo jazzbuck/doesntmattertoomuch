@@ -54,9 +54,7 @@ struct PictureThis : Module {
 		NUM_INPUTS
 	};
 	enum OutputIds {
-		R_OUTPUT,
-		G_OUTPUT,
-		B_OUTPUT,
+		CV_OUTPUT,
 		NUM_OUTPUTS
 	};
 	enum LightIds {
@@ -87,8 +85,10 @@ struct PictureThis : Module {
                 voltage_per_channel[i] = inputs[CLOCK_INPUT].getVoltage(i);
             }
         }
+        
+        outputs[0].setChannels(comp);
 
-        for (auto i = 0; i < std::min(static_cast<int>(NUM_OUTPUTS), comp); ++i)
+        for (auto i = 0; i < comp; ++i)
         {
             bool const did_turn_on = trigger_per_channel_[i].process(voltage_per_channel[i]);
             if (did_turn_on)
@@ -100,7 +100,7 @@ struct PictureThis : Module {
                 int const image_index = i + comp * count;
                 unsigned char const pixel_value = image_data_.data()[image_index];
                 float const output_voltage = 10.0f * pixel_value / 255.0f;
-                outputs[i].setVoltage(output_voltage);
+                outputs[0].setVoltage(output_voltage, i);
                 // std::cout << "Pixel value (" << i << ") = " << output_voltage << '\n';
             }
         }
@@ -197,9 +197,7 @@ struct PictureThisWidget : ModuleWidget {
 
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(16.576, 47.217)), module, PictureThis::CLOCK_INPUT));
 
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(17.357, 87.598)), module, PictureThis::R_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(17.089, 99.902)), module, PictureThis::G_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(17.351, 111.929)), module, PictureThis::B_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(16.576, 111.929)), module, PictureThis::CV_OUTPUT));
 
 		// mm2px(Vec(116.851, 116.851))
 		addChild(createWidget<Widget>(mm2px(Vec(29.864, 5.502))));
