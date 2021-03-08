@@ -182,37 +182,40 @@ struct PngWidget : TransparentWidget
 
         // Draw the channel pointers
 
-        auto const& channel_positions = module_->getChannelPositions();
-        for (auto i = 0; i < (int)channel_positions.size(); ++i)
+        if (module_)
         {
-            auto color = nvgRGBA(0, 0, 0, 255);
-
-            switch (i % 4)
+            auto const& channel_positions = module_->getChannelPositions();
+            for (auto i = 0; i < (int)channel_positions.size(); ++i)
             {
-            case 0:
-                color = nvgRGBA(255, 0, 0, 255);
-                break;
-            case 1:
-                color = nvgRGBA(0, 255, 0, 255);
-                break;
-            case 2:
-                color = nvgRGBA(0, 0, 255, 255);
-                break;
-            case 3:
-                color = nvgRGBA(0, 0, 0, 255);
-                break;
+                auto color = nvgRGBA(0, 0, 0, 255);
+
+                switch (i % 4)
+                {
+                case 0:
+                    color = nvgRGBA(255, 0, 0, 255);
+                    break;
+                case 1:
+                    color = nvgRGBA(0, 255, 0, 255);
+                    break;
+                case 2:
+                    color = nvgRGBA(0, 0, 255, 255);
+                    break;
+                case 3:
+                    color = nvgRGBA(0, 0, 0, 255);
+                    break;
+                }
+
+                nvgBeginPath(args.vg);
+
+                int const x = channel_positions[i] % image_data_.width();
+                int const y = channel_positions[i] / image_data_.height();
+
+                nvgCircle(args.vg, x + top_left_x, y + top_left_y, 3.0f / scale_factor);
+                nvgFillColor(args.vg, color);
+                nvgFill(args.vg);
+
+                nvgClosePath(args.vg);
             }
-
-            nvgBeginPath(args.vg);
-
-            int const x = channel_positions[i] % image_data_.width();
-            int const y = channel_positions[i] / image_data_.height();
-
-            nvgCircle(args.vg, x + top_left_x, y + top_left_y, 3.0f / scale_factor);
-            nvgFillColor(args.vg, color);
-            nvgFill(args.vg);
-
-            nvgClosePath(args.vg);
         }
     }
 
