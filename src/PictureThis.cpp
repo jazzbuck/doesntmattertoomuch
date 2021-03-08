@@ -154,14 +154,20 @@ struct PngWidget : TransparentWidget
 
         nvgBeginPath(args.vg);
 
-        auto const scale_factor_x = box.size.x / image_data_.width();
-        auto const scale_factor_y = box.size.y / image_data_.height();
-        auto const scale_factor = std::max(scale_factor_x, scale_factor_y);
+        auto const image_width = static_cast<float>(image_data_.width());
+        auto const image_height = static_cast<float>(image_data_.height());
+
+        auto const scale_factor_x = box.size.x / image_width;
+        auto const scale_factor_y = box.size.y / image_height;
+        auto const scale_factor = std::min(scale_factor_x, scale_factor_y);
+
+        float const x = 0.5f * (box.size.x / scale_factor - image_width);
+        float const y = 0.5f * (box.size.y / scale_factor - image_height);
+
         nvgScale(args.vg, scale_factor, scale_factor);
 
-        NVGpaint const paint =
-            nvgImagePattern(args.vg, x_, y_, image_data_.width(), image_data_.height(), 0.0f, nvg_handle_, 1.0f);
-        nvgRect(args.vg, x_, y_, image_data_.width(), image_data_.height());
+        NVGpaint paint = nvgImagePattern(args.vg, x, y, image_width, image_height, 0.0f, nvg_handle_, 1.0f);
+        nvgRect(args.vg, x, y, image_width, image_height);
         nvgFillPaint(args.vg, paint);
         nvgFill(args.vg);
 
@@ -172,8 +178,6 @@ private:
     bool new_image_{};
 
     ImageData image_data_{};
-    int x_{};
-    int y_{};
     int nvg_handle_{};
 
     PictureThis* module_;
