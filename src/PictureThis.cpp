@@ -107,6 +107,11 @@ struct PictureThis : Module {
         count_per_channel_.resize(image_data_.comp(), 0);
     }
 
+    std::vector<int> const& getChannelPositions() const
+    {
+        return count_per_channel_;
+    }
+
 private:
     std::vector<dsp::SchmittTrigger> trigger_per_channel_{};
     std::vector<int> count_per_channel_{};
@@ -152,8 +157,6 @@ struct PngWidget : TransparentWidget
             new_image_ = false;
         }
 
-        nvgBeginPath(args.vg);
-
         auto const image_width = static_cast<float>(image_data_.width());
         auto const image_height = static_cast<float>(image_data_.height());
 
@@ -161,17 +164,56 @@ struct PngWidget : TransparentWidget
         auto const scale_factor_y = box.size.y / image_height;
         auto const scale_factor = std::min(scale_factor_x, scale_factor_y);
 
-        float const x = 0.5f * (box.size.x / scale_factor - image_width);
-        float const y = 0.5f * (box.size.y / scale_factor - image_height);
+        float const top_left_x = 0.5f * (box.size.x / scale_factor - image_width);
+        float const top_left_y = 0.5f * (box.size.y / scale_factor - image_height);
 
         nvgScale(args.vg, scale_factor, scale_factor);
 
-        NVGpaint paint = nvgImagePattern(args.vg, x, y, image_width, image_height, 0.0f, nvg_handle_, 1.0f);
-        nvgRect(args.vg, x, y, image_width, image_height);
+        // Draw the image
+
+        nvgBeginPath(args.vg);
+
+        NVGpaint paint = nvgImagePattern(args.vg, top_left_x, top_left_y, image_width, image_height, 0.0f, nvg_handle_, 1.0f);
+        nvgRect(args.vg, top_left_x, top_left_y, image_width, image_height);
         nvgFillPaint(args.vg, paint);
         nvgFill(args.vg);
 
         nvgClosePath(args.vg);
+
+        // Draw the channel pointers
+
+        auto const& channel_positions = module_->getChannelPositions();
+        for (auto i = 0; i < (int)channel_positions.size(); ++i)
+        {
+            auto color = nvgRGBA(0, 0, 0, 255);
+
+            switch (i % 4)
+            {
+            case 0:
+                color = nvgRGBA(255, 0, 0, 255);
+                break;
+            case 1:
+                color = nvgRGBA(0, 255, 0, 255);
+                break;
+            case 2:
+                color = nvgRGBA(0, 0, 255, 255);
+                break;
+            case 3:
+                color = nvgRGBA(0, 0, 0, 255);
+                break;
+            }
+
+            nvgBeginPath(args.vg);
+
+            int const x = channel_positions[i] % image_data_.width();
+            int const y = channel_positions[i] / image_data_.height();
+
+            nvgCircle(args.vg, x + top_left_x, y + top_left_y, 3.0f / scale_factor);
+            nvgFillColor(args.vg, color);
+            nvgFill(args.vg);
+
+            nvgClosePath(args.vg);
+        }
     }
 
 private:
