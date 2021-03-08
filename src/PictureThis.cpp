@@ -72,10 +72,12 @@ struct PictureThis : Module {
         auto const num_channels = inputs[CLOCK_INPUT].getChannels();
 
         std::vector<float> voltage_per_channel(comp);
+        if (inputs[CLOCK_INPUT].isConnected()) {
 
-        for (auto i = 0; i < comp; ++i)
-        {
-            voltage_per_channel[i] = inputs[CLOCK_INPUT].getVoltage(i % num_channels);
+            for (auto i = 0; i < comp; ++i)
+            {
+                voltage_per_channel[i] = inputs[CLOCK_INPUT].getVoltage(i % num_channels);
+            }
         }
         
         outputs[0].setChannels(comp);
