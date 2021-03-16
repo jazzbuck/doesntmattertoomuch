@@ -91,7 +91,7 @@ struct PictureThis : Module {
 
                 count = (count + 1) % (image_data_.width() * image_data_.height());
 
-                int const image_index = i + comp * count;
+                int const image_index = i + 4 * count;
                 unsigned char const pixel_value = image_data_.data()[image_index];
                 float const output_voltage = 10.0f * pixel_value / 255.0f;
                 outputs[0].setVoltage(output_voltage, i);
@@ -210,7 +210,7 @@ struct PngWidget : TransparentWidget
                 int const x = channel_positions[i] % image_data_.width();
                 int const y = channel_positions[i] / image_data_.height();
 
-                nvgCircle(args.vg, x + top_left_x, y + top_left_y, 3.0f / scale_factor);
+                nvgRect(args.vg, x + top_left_x - 1.5f / scale_factor, y + top_left_y - 1.5f / scale_factor, 3.0f / scale_factor, 3.0f / scale_factor);
                 nvgFillColor(args.vg, color);
                 nvgFill(args.vg);
 
